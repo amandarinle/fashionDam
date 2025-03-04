@@ -1,11 +1,6 @@
-// background.js with AI Vision integration
+// background.js 
+
 console.log('Virtual Closet background script loaded');
-
-// Configure your OpenAI API key here - in a production extension, 
-// this would be better stored securely or retrieved from a server
-// NOTE: This key would be visible to users who inspect the extension code
-const OPENAI_API_KEY = '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'; // Replace with your actual key
-
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scrapeCurrentPage') {
