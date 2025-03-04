@@ -1,6 +1,6 @@
-// background.js 
-
+// background.js - Fixed version
 console.log('Virtual Closet background script loaded');
+
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scrapeCurrentPage') {
@@ -16,23 +16,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
       const activeTab = tabs[0];
       
-      // First try to extract product info using content script
+      // Try to extract product info using content script first
       chrome.tabs.sendMessage(
         activeTab.id, 
         { action: 'extractProductInfo' }, 
-        async (response) => {
+        (response) => {
           // Handle errors communicating with content script
           if (chrome.runtime.lastError) {
             console.error('Error communicating with content script:', chrome.runtime.lastError);
             // Take a screenshot as fallback when content script fails
-            takeScreenshotAndProcess(activeTab, sendResponse);
+            chrome.tabs.captureVisibleTab(null, { format: 'png' }, function(dataUrl) {
+              const fallbackResponse = {
+                title: activeTab.title || 'Unknown Product',
+                imageUrl: dataUrl,
+                url: activeTab.url,
+                timestamp: new Date().toISOString()
+              };
+              processProductInfo(fallbackResponse, sendResponse);
+            });
             return;
           }
           
           // If no image was found, try screenshot as fallback
           if (!response || !response.imageUrl) {
             // Take a screenshot of the visible tab
-            takeScreenshotAndProcess(activeTab, sendResponse, response);
+            chrome.tabs.captureVisibleTab(null, { format: 'png' }, function(dataUrl) {
+              if (chrome.runtime.lastError) {
+                console.error('Screenshot failed:', chrome.runtime.lastError);
+                sendResponse({ error: 'Failed to capture product information' });
+              } else if (response) {
+                console.log('Using screenshot as product image');
+                response.imageUrl = dataUrl;
+                processProductInfo(response, sendResponse);
+              } else {
+                const screenshotResponse = {
+                  title: activeTab.title || 'Unknown Product',
+                  imageUrl: dataUrl,
+                  url: activeTab.url,
+                  timestamp: new Date().toISOString()
+                };
+                processProductInfo(screenshotResponse, sendResponse);
+              }
+            });
           } else {
             console.log('Received product info from content script:', response);
             processProductInfo(response, sendResponse);
@@ -43,48 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     return true; // Indicates we will respond asynchronously
   }
-  
-  // Handle saving manually selected product info
-  if (message.action === 'saveProductInfo') {
-    console.log('Saving manually selected product info:', message.productInfo);
-    processProductInfo(message.productInfo, sendResponse);
-    return true; // Indicates we will respond asynchronously
-  }
 });
-
-/**
- * Takes a screenshot and processes it to extract product image
- * @param {Object} tab - The active tab
- * @param {Function} sendResponse - Function to send response back to popup
- * @param {Object} existingInfo - Any info already collected about the product
- */
-function takeScreenshotAndProcess(tab, sendResponse, existingInfo = null) {
-  chrome.tabs.captureVisibleTab(null, { format: 'png' }, async function(dataUrl) {
-    if (chrome.runtime.lastError) {
-      console.error('Screenshot failed:', chrome.runtime.lastError);
-      sendResponse({ error: 'Failed to capture product information' });
-      return;
-    }
-    
-    try {
-      // Option 1: Use the full screenshot
-      const screenshotResponse = {
-        ...(existingInfo || {}),
-        title: existingInfo?.title || tab.title || 'Unknown Product',
-        imageUrl: dataUrl,
-        url: tab.url,
-        timestamp: new Date().toISOString(),
-        extractionMethod: 'screenshot'
-      }; 
-      processProductInfo(screenshotResponse, sendResponse);
-    } catch (error) {
-      console.error('Error processing screenshot:', error);
-      sendResponse({ 
-        error: 'Error processing screenshot: ' + error.message 
-      });
-    }
-  });
-}
 
 /**
  * Process and store product information
