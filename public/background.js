@@ -80,20 +80,7 @@ function takeScreenshotAndProcess(tab, sendResponse, existingInfo = null) {
         url: tab.url,
         timestamp: new Date().toISOString(),
         extractionMethod: 'screenshot'
-      };
-      
-      // Option 2: If you want to use AI vision to process the screenshot
-      // Uncomment this code and replace your OpenAI API key above
-      /*
-      // Process the screenshot with AI vision API to find the product
-      const processedImageUrl = await processImageWithAI(dataUrl);
-      
-      if (processedImageUrl) {
-        screenshotResponse.imageUrl = processedImageUrl;
-        screenshotResponse.extractionMethod = 'ai-vision';
-      }
-      */
-      
+      }; 
       processProductInfo(screenshotResponse, sendResponse);
     } catch (error) {
       console.error('Error processing screenshot:', error);
@@ -103,49 +90,6 @@ function takeScreenshotAndProcess(tab, sendResponse, existingInfo = null) {
     }
   });
 }
-
-// /**
-//  * Process screenshot with AI to extract just the product image
-//  * @param {string} screenshotDataUrl - Data URL of the screenshot
-//  * @returns {Promise<string>} - Data URL of the processed image or null if processing failed
-//  */
-// async function processImageWithAI(screenshotDataUrl) {
-//   try {
-//     // Convert data URL to blob for sending to OpenAI API
-//     const response = await fetch(screenshotDataUrl);
-//     const blob = await response.blob();
-    
-//     // Create form data with the image
-//     const formData = new FormData();
-//     formData.append('image', blob, 'screenshot.png');
-//     formData.append('prompt', 'Identify and extract only the main product (clothing item) from this e-commerce page. Remove all background elements, navigation, text, and other UI elements. Just show the product against a plain white background.');
-    
-//     // Send to OpenAI Vision API
-//     const visionResponse = await fetch('https://api.openai.com/v1/images/generations', {
-//       method: 'POST',
-//       headers: {
-//         'Authorization': `Bearer ${OPENAI_API_KEY}`
-//       },
-//       body: formData
-//     });
-    
-//     if (!visionResponse.ok) {
-//       throw new Error(`Vision API error: ${visionResponse.status}`);
-//     }
-    
-//     const data = await visionResponse.json();
-    
-//     // Check if we got a processed image back
-//     if (data.data && data.data[0] && data.data[0].url) {
-//       return data.data[0].url;
-//     }
-    
-//     return null;
-//   } catch (error) {
-//     console.error('Error in AI vision processing:', error);
-//     return null;
-//   }
-// }
 
 /**
  * Process and store product information
