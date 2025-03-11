@@ -1,81 +1,123 @@
-// background.js - Fixed version
+// background.js 
 console.log('Virtual Closet background script loaded');
 
-// Listen for messages from the popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'scrapeCurrentPage') {
-    console.log('Received request to scrape current page');
+// Create context menu and browser action when extension is installed
+chrome.runtime.onInstalled.addListener(() => {
+  // Create context menu for right-clicking on images
+  chrome.contextMenus.create({
+    id: "addToVirtualCloset",
+    title: "Add to Virtual Closet",
+    contexts: ["image"]
+  });
+  
+  // Create browser action button
+  chrome.action.onClicked.addListener(() => {
+    // When the extension icon is clicked (not the popup), open the full page
+    openFullPage();
+  });
+});
+
+// Function to open the extension as a full page
+function openFullPage() {
+  // Make sure we use the correct path with extension:// protocol
+  const fullPageURL = chrome.runtime.getURL('fullpage.html');
+  console.log('Attempting to open fullpage URL:', fullPageURL);
+  
+  // Check if the fullpage is already open
+  chrome.tabs.query({url: fullPageURL}, (tabs) => {
+    if (tabs.length > 0) {
+      // If already open, just focus that tab
+      chrome.tabs.update(tabs[0].id, {active: true});
+    } else {
+      // Otherwise, open a new tab with our full page
+      chrome.tabs.create({url: fullPageURL});
+    }
+  });
+}
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "addToVirtualCloset") {
+    console.log("Context menu item clicked");
     
-    // Get the active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length === 0) {
-        console.error('No active tab found');
-        sendResponse({ error: 'No active tab found' });
-        return;
-      }
-      
-      const activeTab = tabs[0];
-      
-      // Try to extract product info using content script first
+    // Get the image URL that was right-clicked
+    const imageUrl = info.srcUrl;
+    
+    if (imageUrl) {
+      // Try to extract product info from the page
       chrome.tabs.sendMessage(
-        activeTab.id, 
-        { action: 'extractProductInfo' }, 
+        tab.id, 
+        { 
+          action: 'extractProductInfoForImage',
+          imageUrl: imageUrl  
+        }, 
         (response) => {
           // Handle errors communicating with content script
           if (chrome.runtime.lastError) {
             console.error('Error communicating with content script:', chrome.runtime.lastError);
-            // Take a screenshot as fallback when content script fails
-            chrome.tabs.captureVisibleTab(null, { format: 'png' }, function(dataUrl) {
-              const fallbackResponse = {
-                title: activeTab.title || 'Unknown Product',
-                imageUrl: dataUrl,
-                url: activeTab.url,
-                timestamp: new Date().toISOString()
-              };
-              processProductInfo(fallbackResponse, sendResponse);
-            });
+            // Create fallback product info with just the image
+            const fallbackResponse = {
+              title: tab.title || 'Unknown Product',
+              imageUrl: imageUrl,
+              url: tab.url,
+              timestamp: new Date().toISOString()
+            };
+            processProductInfo(fallbackResponse);
             return;
           }
           
-          // If no image was found, try screenshot as fallback
-          if (!response || !response.imageUrl) {
-            // Take a screenshot of the visible tab
-            chrome.tabs.captureVisibleTab(null, { format: 'png' }, function(dataUrl) {
-              if (chrome.runtime.lastError) {
-                console.error('Screenshot failed:', chrome.runtime.lastError);
-                sendResponse({ error: 'Failed to capture product information' });
-              } else if (response) {
-                console.log('Using screenshot as product image');
-                response.imageUrl = dataUrl;
-                processProductInfo(response, sendResponse);
-              } else {
-                const screenshotResponse = {
-                  title: activeTab.title || 'Unknown Product',
-                  imageUrl: dataUrl,
-                  url: activeTab.url,
-                  timestamp: new Date().toISOString()
-                };
-                processProductInfo(screenshotResponse, sendResponse);
-              }
-            });
+          if (response) {
+            // Make sure we're using the right-clicked image
+            response.imageUrl = imageUrl;
+            processProductInfo(response);
           } else {
-            console.log('Received product info from content script:', response);
-            processProductInfo(response, sendResponse);
+            // Fallback if no response
+            const fallbackResponse = {
+              title: tab.title || 'Unknown Product',
+              imageUrl: imageUrl,
+              url: tab.url,
+              timestamp: new Date().toISOString()
+            };
+            processProductInfo(fallbackResponse);
           }
         }
       );
+    }
+  }
+});
+
+// Listen for messages from the popup or fullpage
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'openFullPage') {
+    // Open the full page view
+    openFullPage();
+    sendResponse({ success: true });
+  } else if (message.action === 'getWardrobe') {
+    // Get wardrobe data for fullpage or popup
+    chrome.storage.local.get('wardrobe', (data) => {
+      sendResponse({ 
+        success: true,
+        wardrobe: data.wardrobe || []
+      });
     });
-    
-    return true; // Indicates we will respond asynchronously
+    return true; // Will respond asynchronously
+  } else if (message.action === 'updateWardrobe') {
+    // Save updated wardrobe data from fullpage
+    if (message.wardrobe) {
+      chrome.storage.local.set({ wardrobe: message.wardrobe }, () => {
+        sendResponse({ success: true });
+      });
+      return true; // Will respond asynchronously
+    }
   }
 });
 
 /**
  * Process and store product information
  * @param {Object} response - The product info to process
- * @param {Function} sendResponse - Function to send response back to popup
+ * @param {Function} sendResponse - Optional function to send response back to popup
  */
-function processProductInfo(response, sendResponse) {
+function processProductInfo(response, sendResponse = null) {
   // Save to storage
   if (response && response.imageUrl) {
     // Simple category detection
@@ -107,14 +149,30 @@ function processProductInfo(response, sendResponse) {
       wardrobe.push(productWithCategory);
       
       chrome.storage.local.set({ wardrobe }, () => {
-        sendResponse({ 
-          success: true, 
-          message: 'Product added to your virtual wardrobe',
-          product: productWithCategory
+        // Show a notification to the user
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: '/vite.svg',
+          title: 'Virtual Closet',
+          message: 'Item added to your wardrobe!'
+        });
+        
+        if (sendResponse) {
+          sendResponse({ 
+            success: true, 
+            message: 'Product added to your virtual wardrobe',
+            product: productWithCategory
+          });
+        }
+        
+        // Broadcast update to any open instances of the extension
+        chrome.runtime.sendMessage({
+          action: 'wardrobeUpdated',
+          wardrobe: wardrobe
         });
       });
     });
-  } else {
+  } else if (sendResponse) {
     sendResponse({ 
       error: 'Could not detect product information on this page.' 
     });

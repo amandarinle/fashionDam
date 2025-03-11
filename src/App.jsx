@@ -1,120 +1,4 @@
-// Handle manual image selection
-const handleManualImageSelection = async () => {
-  setScrapeStatus('loading');
-  setMessage(null);
-  
-  try {
-    // Check if chrome is available
-    if (typeof chrome === 'undefined' || !chrome.runtime) {
-      setScrapeStatus('error');
-      setMessage({ 
-        type: 'error', 
-        text: 'Extension API not available. Are you running in development mode?' 
-      });
-      return;
-    }
-    
-    // Get the active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length === 0) {
-        setScrapeStatus('error');
-        setMessage({ type: 'error', text: 'No active tab found' });
-        return;
-      }
-      
-      const activeTab = tabs[0];
-      
-      // Inject the image selector content script
-      chrome.scripting.executeScript({
-        target: { tabId: activeTab.id },
-        files: ['image-selector.js']
-      }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Error injecting script:', chrome.runtime.lastError);
-          setScrapeStatus('error');
-          setMessage({ 
-            type: 'error', 
-            text: 'Failed to inject image selector: ' + chrome.runtime.lastError.message 
-          });
-          return;
-        }
-        
-        // Start image selection mode
-        chrome.tabs.sendMessage(
-          activeTab.id,
-          { action: 'startImageSelection' },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.error('Error:', chrome.runtime.lastError);
-              setScrapeStatus('error');
-              setMessage({ 
-                type: 'error', 
-                text: 'Failed to start image selection mode.'
-              });
-              return;
-            }
-            
-            if (response && response.cancelled) {
-              setScrapeStatus(null);
-              setMessage(null);
-              return;
-            }
-            
-            if (response && response.imageUrl) {
-              // Create a product info object from the selected image
-              const productInfo = {
-                title: response.title || activeTab.title || 'Unknown Product',
-                imageUrl: response.imageUrl,
-                url: activeTab.url,
-                description: response.alt || '',
-                timestamp: new Date().toISOString(),
-                extractionMethod: 'manual-selection'
-              };
-              
-              // Save to storage using the background script
-              chrome.runtime.sendMessage({
-                action: 'saveProductInfo',
-                productInfo
-              }, (saveResponse) => {
-                if (chrome.runtime.lastError) {
-                  console.error('Error saving:', chrome.runtime.lastError);
-                  setScrapeStatus('error');
-                  setMessage({ 
-                    type: 'error', 
-                    text: 'Failed to save selected image.'
-                  });
-                  return;
-                }
-                
-                setScrapeStatus('success');
-                setMessage({ 
-                  type: 'success', 
-                  text: 'Image added to your wardrobe!'
-                });
-                
-                // Refresh wardrobe
-                loadWardrobe();
-              });
-            } else {
-              setScrapeStatus('error');
-              setMessage({ 
-                type: 'error', 
-                text: 'No image was selected.'
-              });
-            }
-          }
-        );
-      });
-    });
-  } catch (error) {
-    console.error('Selection error:', error);
-    setScrapeStatus('error');
-    setMessage({ 
-      type: 'error', 
-      text: 'Failed to start image selection: ' + error.message 
-    });
-  }
-};import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
@@ -122,9 +6,6 @@ const [tab, setTab] = useState('wardrobe'); // 'wardrobe', 'outfits', 'add'
 const [wardrobe, setWardrobe] = useState([]);
 const [loading, setLoading] = useState(false);
 const [message, setMessage] = useState(null);
-const [scrapeStatus, setScrapeStatus] = useState(null);
-const [debugMode, setDebugMode] = useState(false);
-
 // Load wardrobe data on component mount
 useEffect(() => {
   loadWardrobe();
@@ -175,65 +56,12 @@ const handleDeleteItem = (timestamp) => {
   }
 };
 
-// Handle scraping the current page
-const handleScrapeCurrentPage = async () => {
-  setScrapeStatus('loading');
-  setMessage(null);
-  
-  try {
-    // Check if chrome is available
-    if (typeof chrome === 'undefined' || !chrome.runtime) {
-      setScrapeStatus('error');
-      setMessage({ 
-        type: 'error', 
-        text: 'Extension API not available. Are you running in development mode?' 
-      });
-      return;
-    }
-    
-    // Send message to background script
-    chrome.runtime.sendMessage({ 
-      action: 'scrapeCurrentPage' 
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Error:', chrome.runtime.lastError);
-        setScrapeStatus('error');
-        setMessage({ 
-          type: 'error', 
-          text: 'Failed to communicate with the extension: ' + chrome.runtime.lastError.message 
-        });
-        return;
-      }
-      
-      if (response && response.error) {
-        setScrapeStatus('error');
-        setMessage({ type: 'error', text: response.error });
-      } else if (response && response.success) {
-        setScrapeStatus('success');
-        setMessage({ 
-          type: 'success', 
-          text: response.message || 'Item added to your wardrobe!' 
-        });
-        
-        console.log('Product added to wardrobe:', response.product);
-        
-        // Refresh wardrobe
-        loadWardrobe();
-      } else {
-        setScrapeStatus('error');
-        setMessage({ 
-          type: 'error', 
-          text: 'Unknown response from extension' 
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Scraping error:', error);
-    setScrapeStatus('error');
-    setMessage({ 
-      type: 'error', 
-      text: 'Failed to extract product information: ' + error.message 
-    });
+// Open the full page view
+const openFullPage = () => {
+  if (typeof chrome !== 'undefined' && chrome.runtime) {
+    chrome.runtime.sendMessage({ action: 'openFullPage' });
+  } else {
+    setMessage({ type: 'error', text: 'Full page view is only available in the extension.' });
   }
 };
 
@@ -277,29 +105,7 @@ const renderWardrobe = () => {
   if (wardrobe.length === 0) {
     return (
       <div className="empty-state">
-        <p>Your wardrobe is empty. Add items by clicking "Add to Wardrobe" while viewing product pages.</p>
-      </div>
-    );
-  }
-  
-  // Debug view
-  if (debugMode) {
-    return (
-      <div className="debug-view">
-        <h2>Debug View</h2>
-        <button onClick={() => setDebugMode(false)}>Hide Debug Info</button>
-        <button onClick={() => {
-          if (confirm('Clear all wardrobe data?')) {
-            chrome.storage.local.set({ wardrobe: [] }, () => {
-              setWardrobe([]);
-              setMessage({ type: 'success', text: 'Wardrobe data cleared.' });
-            });
-          }
-        }}>Clear All Data</button>
-        
-        <pre className="debug-data">
-          {JSON.stringify(wardrobe, null, 2)}
-        </pre>
+        <p>Your wardrobe is empty. Add items by right-clicking on clothing images while browsing.</p>
       </div>
     );
   }
@@ -315,11 +121,8 @@ const renderWardrobe = () => {
   return (
     <div className="wardrobe-container">
       <div className="controls">
-        <button className="debug-button" onClick={() => setDebugMode(true)}>
-          Debug Mode
-        </button>
-        <button className="refresh-button" onClick={loadWardrobe}>
-          Refresh Data
+        <button className="full-page-button" onClick={openFullPage}>
+          Open Full Page View
         </button>
       </div>
     
@@ -339,25 +142,19 @@ const renderWardrobe = () => {
 const renderAddTab = () => (
   <div className="add-tab">
     <h2>Add to Your Wardrobe</h2>
-    <p>Navigate to a product page on any shopping website, then click one of the buttons below:</p>
+    <p>To add clothing items to your wardrobe, simply right-click on any clothing image while browsing and select "Add to Virtual Closet" from the context menu.</p>
     
-    <div className="button-group">
-      <button 
-        className={`scrape-button ${scrapeStatus === 'loading' ? 'loading' : ''}`}
-        onClick={handleScrapeCurrentPage}
-        disabled={scrapeStatus === 'loading'}
-      >
-        {scrapeStatus === 'loading' ? 'Adding to Wardrobe...' : 'Auto-Detect Item'}
-      </button>
-      
-      <button 
-        className="select-image-button"
-        onClick={handleManualImageSelection}
-        disabled={scrapeStatus === 'loading'}
-      >
-        Select Image Manually
-      </button>
+    <div className="add-method">
+      <img src="right-click-demo.png" alt="Right Click Demo" className="demo-image" />
+      <p>Browse your favorite clothing websites and use the right-click menu to quickly add items.</p>
     </div>
+    
+    <button 
+      className="full-page-button"
+      onClick={openFullPage}
+    >
+      Open Full Page View
+    </button>
     
     {message && (
       <div className={`message ${message.type}`}>
@@ -372,6 +169,9 @@ const renderOutfits = () => (
   <div className="outfits-tab">
     <h2>Your Outfits</h2>
     <p>This feature is coming soon! You'll be able to create and save outfits here.</p>
+    <button className="full-page-button" onClick={openFullPage}>
+      Open Full Page View
+    </button>
   </div>
 );
 
