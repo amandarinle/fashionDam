@@ -28,7 +28,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["fullpage.html", "assets/*", "vite.svg"],
+      "resources": ["fullpage.html", "fullpage-script,js", "assets/*", "vite.svg"],
       "matches": ["<all_urls>"]
     }
   ],

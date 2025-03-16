@@ -106,6 +106,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.wardrobe) {
       chrome.storage.local.set({ wardrobe: message.wardrobe }, () => {
         sendResponse({ success: true });
+        
+        // Broadcast the update to all open extension pages
+        chrome.runtime.sendMessage({
+          action: 'wardrobeUpdated',
+          wardrobe: message.wardrobe
+        });
       });
       return true; // Will respond asynchronously
     }
@@ -122,21 +128,23 @@ function processProductInfo(response, sendResponse = null) {
   if (response && response.imageUrl) {
     // Simple category detection
     let category = 'other';
-    const text = (response.title + ' ' + (response.description || '')).toLowerCase();
+    const text = (response.title + ' ' + (response.description || '') + ' ' + (response.detailedDescription || '')).toLowerCase();
     
-    if (text.includes('shirt') || text.includes('top') || text.includes('tee') || text.includes('sweater')) {
+    if (text.includes('shirt') || text.includes('top') || text.includes('tee') || text.includes('sweater') || text.includes('blouse') || text.includes('tank')) {
       category = 'tops';
-    } else if (text.includes('pant') || text.includes('jean') || text.includes('skirt') || text.includes('short')) {
+    } else if (text.includes('pant') || text.includes('jean') || text.includes('skirt') || text.includes('short') || text.includes('trouser') || text.includes('chino')) {
       category = 'bottoms';
-    } else if (text.includes('shoe') || text.includes('boot') || text.includes('sneaker')) {
+    } else if (text.includes('shoe') || text.includes('boot') || text.includes('sneaker') || text.includes('sandal') || text.includes('loafer') || text.includes('heel')) {
       category = 'shoes';
     } else if (text.includes('dress')) {
       category = 'dresses';
-    } else if (text.includes('jacket') || text.includes('coat')) {
+    } else if (text.includes('jacket') || text.includes('coat') || text.includes('hoodie') || text.includes('cardigan') || text.includes('blazer')) {
       category = 'outerwear';
+    } else if (text.includes('hat') || text.includes('scarf') || text.includes('glove') || text.includes('sock') || text.includes('belt') || text.includes('jewelry') || text.includes('accessory')) {
+      category = 'accessories';
     }
     
-    // Add category to the product
+    // Add category and timestamp to the product
     const productWithCategory = {
       ...response,
       category,
@@ -178,5 +186,7 @@ function processProductInfo(response, sendResponse = null) {
     });
   }
 }
+  
+  
   
   

@@ -8,8 +8,8 @@ export default defineConfig({
     outDir: "dist",
     rollupOptions: {
       input: {
-        main: "index.html",
-        fullpage: "fullpage.html"
+        main: resolve(__dirname, 'index.html'),
+        fullpage: resolve(__dirname, 'fullpage.html')
       }
     }
   },
