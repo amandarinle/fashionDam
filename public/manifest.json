@@ -28,11 +28,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["fullpage.html", "fullpage-script,js", "assets/*", "vite.svg"],
+      "resources": ["fullpage.html", "fullpage-script,js", "ai-outfit-service.js", "assets/*", "vite.svg"],
       "matches": ["<all_urls>"]
     }
   ],
   "host_permissions": [
+    "https://api.openai.com/*",
     "<all_urls>"
   ],
   "icons": {

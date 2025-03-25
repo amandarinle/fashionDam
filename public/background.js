@@ -15,6 +15,21 @@ chrome.runtime.onInstalled.addListener(() => {
     // When the extension icon is clicked (not the popup), open the full page
     openFullPage();
   });
+  
+  // Initialize settings if they don't exist
+  chrome.storage.local.get(['openai_api_key', 'ai_outfit_settings'], (data) => {
+    if (!data.ai_outfit_settings) {
+      chrome.storage.local.set({
+        ai_outfit_settings: {
+          enabled: true,
+          model: 'gpt-3.5-turbo'
+        }
+      });
+    }
+    
+    // Note: We don't set a default API key as it should be user-provided
+    // or securely stored by the developer
+  });
 });
 
 // Function to open the extension as a full page
@@ -88,11 +103,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 // Listen for messages from the popup or fullpage
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('Received message in background script:', message.action);
+  
   if (message.action === 'openFullPage') {
     // Open the full page view
     openFullPage();
     sendResponse({ success: true });
-  } else if (message.action === 'getWardrobe') {
+  } 
+  else if (message.action === 'getWardrobe') {
     // Get wardrobe data for fullpage or popup
     chrome.storage.local.get('wardrobe', (data) => {
       sendResponse({ 
@@ -101,7 +119,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
     return true; // Will respond asynchronously
-  } else if (message.action === 'updateWardrobe') {
+  } 
+  else if (message.action === 'updateWardrobe') {
     // Save updated wardrobe data from fullpage
     if (message.wardrobe) {
       chrome.storage.local.set({ wardrobe: message.wardrobe }, () => {
@@ -116,7 +135,112 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true; // Will respond asynchronously
     }
   }
+  else if (message.action === 'generateOutfit') {
+    // Forward the request to the AI service
+    console.log('Forwarding generateOutfit request to AI service');
+    
+    // Get the wardrobe if not provided
+    if (!message.wardrobe) {
+      chrome.storage.local.get('wardrobe', (data) => {
+        const updatedMessage = {
+          ...message,
+          wardrobe: data.wardrobe || []
+        };
+        
+        // Now forward to the AI service
+        forwardToAIService(updatedMessage, sendResponse);
+      });
+      return true; // Will respond asynchronously
+    } else {
+      // Wardrobe already provided, just forward
+      forwardToAIService(message, sendResponse);
+      return true; // Will respond asynchronously
+    }
+  }
+  else if (message.action === 'processAIRequest') {
+    // Handle the API request with your own key
+    handleOpenAIRequest(message.prompt, sendResponse);
+    return true; // Will respond asynchronously
+  }
 });
+
+// Forward a message to the AI service
+function forwardToAIService(message, sendResponse) {
+  try {
+    // The AI service is loaded as a separate script
+    // We'll just forward the message to it
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error forwarding to AI service:', chrome.runtime.lastError);
+        sendResponse({ 
+          success: false, 
+          error: chrome.runtime.lastError.message || 'Could not communicate with AI service'
+        });
+      } else {
+        sendResponse(response);
+      }
+    });
+  } catch (error) {
+    console.error('Error in forwardToAIService:', error);
+    sendResponse({ 
+      success: false, 
+      error: error.message || 'Unknown error in AI service communication'
+    });
+  }
+}
+
+// Handle OpenAI API requests with your own API key
+async function handleOpenAIRequest(prompt, sendResponse) {
+  const OPENAI_API_KEY = 'API KEY' // Replace with your actual OpenAI API key
+  const API_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+  const MODEL = 'gpt-3.5-turbo';
+  
+  try {
+    console.log('Processing OpenAI request with server-side key');
+    
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful fashion assistant that creates outfits from users\' wardrobes.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API Error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+    
+    const data = await response.json();
+    console.log('OpenAI response:', data);
+    
+    sendResponse({
+      success: true,
+      result: data.choices[0]?.message?.content || ''
+    });
+    
+  } catch (error) {
+    console.error('Error in OpenAI request:', error);
+    sendResponse({
+      success: false,
+      error: error.message || 'Failed to process OpenAI request'
+    });
+  }
+}
 
 /**
  * Process and store product information
