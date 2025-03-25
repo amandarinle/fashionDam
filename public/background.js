@@ -191,7 +191,8 @@ function forwardToAIService(message, sendResponse) {
 
 // Handle OpenAI API requests with your own API key
 async function handleOpenAIRequest(prompt, sendResponse) {
-  const OPENAI_API_KEY = 'API KEY' // Replace with your actual OpenAI API key
+  const OPENAI_API_KEY = 'API KEY' // Replace with actual OpenAI API key (see comment below)
+  // key: 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
   const API_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
   const MODEL = 'gpt-3.5-turbo';
   
