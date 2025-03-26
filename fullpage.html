@@ -5,23 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Closet</title>
   <link rel="stylesheet" href="./src/fullpage.css">
+  <link rel="stylesheet" href="./src/styling.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
   <style>
-    /* Add any additional styles here if needed */
+    /* Additional style adjustments to ensure compatibility */
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Ensure our custom navigation doesn't conflict with existing CSS */
+    #wardrobe-view, #outfits-view, #add-view {
+      padding-top: 1.5rem;
+    }
   </style>
 </head>
 <body>
   <div id="app">
-    <header>
-      <div class="logo">
-        <img src="vite.svg" alt="Virtual Closet Logo">
-        <h1>Virtual Closet</h1>
+    <!-- New Navigation Bar -->
+    <nav class="navbar">
+      <div class="top-bar">
+        <div class="logo">
+          <img src="vite.svg" alt="Virtual Closet Logo" height="50px">
+        </div>
+        <h1 class="title">WARDROBE</h1>
       </div>
-      <nav class="main-nav">
-        <button id="wardrobe-tab" class="active">My Wardrobe</button>
-        <button id="outfit-tab">Outfits</button>
-        <button id="add-tab">Add Item</button>
-      </nav>
-    </header>
+      <div class="nav-container">
+        <ul class="nav-links">
+          <li id="wardrobe-tab-menu"><a href="#wardrobe">View All</a></li>
+          <li id="tops-tab-menu"><a href="#tops">Tops</a></li>
+          <li id="bottoms-tab-menu"><a href="#bottoms">Bottoms</a></li>
+          <li id="dresses-tab-menu"><a href="#dresses">Dresses/Jumpsuits</a></li>
+          <li id="shoes-tab-menu"><a href="#shoes">Shoes</a></li>
+          <li id="accessories-tab-menu"><a href="#accessories">Accessories</a></li>
+          <li id="outfit-tab-menu"><a href="#outfits">Outfits</a></li>
+          <li id="add-tab-menu" class="heart"><a href="#add">&#9825;</a></li>
+        </ul>
+      </div>
+    </nav>
     
     <main>
       <!-- Wardrobe View -->
@@ -38,6 +60,7 @@
               <option value="shoes">Shoes</option>
               <option value="dresses">Dresses</option>
               <option value="outerwear">Outerwear</option>
+              <option value="accessories">Accessories</option>
               <option value="other">Other</option>
             </select>
           </div>
@@ -86,6 +109,96 @@
   <script type="module">
     // Import the main script
     import './src/fullpage.js';
+    
+    // Update navigation to work with new menu structure
+    document.addEventListener('DOMContentLoaded', () => {
+      // Make the top-level category links work with the filter
+      document.getElementById('wardrobe-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('wardrobe-tab', 'wardrobe-view');
+        document.getElementById('category-filter').value = 'all';
+        // Trigger the change event to update the filter
+        const event = new Event('change');
+        document.getElementById('category-filter').dispatchEvent(event);
+      });
+      
+      document.getElementById('tops-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('wardrobe-tab', 'wardrobe-view');
+        document.getElementById('category-filter').value = 'tops';
+        // Trigger the change event to update the filter
+        const event = new Event('change');
+        document.getElementById('category-filter').dispatchEvent(event);
+      });
+      
+      document.getElementById('bottoms-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('wardrobe-tab', 'wardrobe-view');
+        document.getElementById('category-filter').value = 'bottoms';
+        // Trigger the change event to update the filter
+        const event = new Event('change');
+        document.getElementById('category-filter').dispatchEvent(event);
+      });
+      
+      document.getElementById('dresses-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('wardrobe-tab', 'wardrobe-view');
+        document.getElementById('category-filter').value = 'dresses';
+        // Trigger the change event to update the filter
+        const event = new Event('change');
+        document.getElementById('category-filter').dispatchEvent(event);
+      });
+      
+      document.getElementById('shoes-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('wardrobe-tab', 'wardrobe-view');
+        document.getElementById('category-filter').value = 'shoes';
+        // Trigger the change event to update the filter
+        const event = new Event('change');
+        document.getElementById('category-filter').dispatchEvent(event);
+      });
+      
+      document.getElementById('accessories-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('wardrobe-tab', 'wardrobe-view');
+        document.getElementById('category-filter').value = 'accessories';
+        // Trigger the change event to update the filter
+        const event = new Event('change');
+        document.getElementById('category-filter').dispatchEvent(event);
+      });
+      
+      document.getElementById('outfit-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('outfit-tab', 'outfits-view');
+      });
+      
+      document.getElementById('add-tab-menu').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('add-tab', 'add-view');
+      });
+      
+      // Function to switch tabs (copied from fullpage.js for convenience)
+      function switchTab(tabId, viewId) {
+        // Update active tab in the navigation
+        document.querySelectorAll('.nav-links li').forEach(li => {
+          li.classList.remove('active');
+        });
+        
+        if (tabId === 'wardrobe-tab') {
+          document.getElementById('wardrobe-tab-menu').classList.add('active');
+        } else if (tabId === 'outfit-tab') {
+          document.getElementById('outfit-tab-menu').classList.add('active');
+        } else if (tabId === 'add-tab') {
+          document.getElementById('add-tab-menu').classList.add('active');
+        }
+        
+        // Update view
+        document.querySelectorAll('main > section').forEach(section => {
+          section.classList.add('hidden');
+        });
+        document.getElementById(viewId).classList.remove('hidden');
+      }
+    });
   </script>
 </body>
 </html>
